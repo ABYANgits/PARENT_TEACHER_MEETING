@@ -21,11 +21,17 @@ export default function Login() {
             return
         }
 
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', data.user.id)
             .single()
+
+        if (profileError) {
+            console.error("Profile fetch error:", profileError)
+            alert("Could not fetch user profile")
+            return
+        }
 
         if (profile?.role === 'parent') {
             router.push("/parent")
@@ -42,14 +48,14 @@ export default function Login() {
         <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
             <div className="w-full max-w-md bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/50 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-shadow duration-300">
                 <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-8 text-center">Welcome Back</h1>
-                
+
                 <div className="flex flex-col gap-5">
                     <input className={inputTheme} placeholder="Email Address" onChange={(e) => setEmail(e.target.value)} />
                     <div className="relative">
                         <input className={inputTheme} type={showPassword ? "text" : "password"} placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-                        <button 
-                            type="button" 
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700" 
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
                             onClick={() => setShowPassword(!showPassword)}
                         >
                             {showPassword ? (
@@ -68,7 +74,7 @@ export default function Login() {
                     <button className="mt-4 w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition hover:-translate-y-0.5" onClick={login}>
                         Log In
                     </button>
-                    
+
                     <div className="mt-4 text-center">
                         <button className="text-sm text-purple-600 hover:text-indigo-800 font-medium transition-colors hover:underline" onClick={() => router.push("/signup")}>
                             Don't have an account? Sign up
