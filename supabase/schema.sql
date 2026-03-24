@@ -44,17 +44,20 @@ CREATE TABLE public.meetings (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, role)
-  VALUES (
-    new.id,
-    new.raw_user_meta_data->>'name',
-    (new.raw_user_meta_data->>'role')::user_role
-  );
-  
-  -- If role is teacher, also insert an empty record in teachers table so constraints are met.
-  IF new.raw_user_meta_data->>'role' = 'teacher' THEN
-    INSERT INTO public.teachers (id, subject, experience)
-    VALUES (new.id, COALESCE(new.raw_user_meta_data->>'subject', 'General'), new.raw_user_meta_data->>'experience');
+  -- Only create profile automatically if role is provided (email/password signup).
+  -- Google OAuth users won't have a role; they pick it on /choose-role page.
+  IF new.raw_user_meta_data->>'role' IS NOT NULL THEN
+    INSERT INTO public.profiles (id, name, role)
+    VALUES (
+      new.id,
+      COALESCE(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name', 'User'),
+      (new.raw_user_meta_data->>'role')::user_role
+    );
+    
+    IF new.raw_user_meta_data->>'role' = 'teacher' THEN
+      INSERT INTO public.teachers (id, subject, experience)
+      VALUES (new.id, COALESCE(new.raw_user_meta_data->>'subject', 'General'), new.raw_user_meta_data->>'experience');
+    END IF;
   END IF;
 
   RETURN new;

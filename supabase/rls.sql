@@ -31,6 +31,10 @@ CREATE POLICY "Teachers are viewable by everyone." ON public.teachers
 CREATE POLICY "Teachers can update their own record." ON public.teachers
   FOR UPDATE USING (auth.uid() = id);
 
+-- Teachers can insert their own record
+CREATE POLICY "Teachers can insert their own record." ON public.teachers
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 --------------------------------------------------------------------------------
 -- Children Policies
 --------------------------------------------------------------------------------
