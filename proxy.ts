@@ -59,6 +59,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // ── Role-Based Access Control (RBAC) ──────────────────────────────────────
+  // If the user IS logged in and tries to access a dashboard, verify their specific role.
+  if (user && (pathname.startsWith('/parent') || pathname.startsWith('/teacher'))) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role
+
+    // Block non-teachers from reaching the Teacher routing tree
+    if (pathname.startsWith('/teacher') && role !== 'teacher') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+
+    // Block non-parents from reaching the Parent routing tree
+    if (pathname.startsWith('/parent') && role !== 'parent') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
+
   // ── Auth-only routes (already logged in) ────────────────────────────────────
   // If the user IS logged in, don't let them re-visit login/signup pages.
   if (user && (pathname === '/login' || pathname === '/signup')) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabaseServer'
+import DOMPurify from 'isomorphic-dompurify'
 
 export async function POST(request: Request) {
   try {
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // 🛡️ XSS Prevention: Strip malicious JS/DOM nodes from raw text 
+    const cleanTopic = DOMPurify.sanitize(topic)
+
     // 1. Authenticate Request
     const supabase = await createServerSupabase()
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -17,6 +21,39 @@ export async function POST(request: Request) {
     if (authError || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // --- SECURITY PATCH: IDOR & Quota DoS Prevention ---
+    // 1. Verify Parent Ownership (IDOR Mitigation)
+    const { data: childData, error: childError } = await supabase
+      .from('children')
+      .select('parent_id')
+      .eq('id', childId)
+      .single()
+
+    if (childError || !childData) {
+      return NextResponse.json({ error: 'Invalid child specified' }, { status: 400 })
+    }
+
+    if (childData.parent_id !== session.user.id) {
+       return NextResponse.json({ error: 'Forbidden: You do not have permission to book for this child' }, { status: 403 })
+    }
+
+    // 2. Enforce Semantic Quota (Volume DoS Mitigation)
+    const now = new Date().toISOString()
+    const { count, error: countError } = await supabase
+      .from('meetings')
+      .select('*', { count: 'exact', head: true })
+      .eq('child_id', childId)
+      .gte('meeting_time', now)
+
+    if (countError) {
+      return NextResponse.json({ error: 'Database bounds check failed' }, { status: 500 })
+    }
+
+    if (count !== null && count >= 3) {
+      return NextResponse.json({ error: 'Rate limit exceeded: A single child cannot have more than 3 upcoming meetings scheduled simultaneously.' }, { status: 429 })
+    }
+    // ----------------------------------------------------
 
     // 2. Fetch Zoom Server-to-Server OAuth Token
     const authString = Buffer.from(`${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`).toString('base64')
@@ -70,7 +107,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        topic: topic,
+        topic: cleanTopic,
         type: 2, // 2 = scheduled meeting
         start_time: new Date(meetingTime).toISOString(),
         duration: 30, // Default duration in minutes
@@ -97,7 +134,7 @@ export async function POST(request: Request) {
       child_id: childId,
       teacher_id: teacherId,
       meeting_time: new Date(meetingTime).toISOString(), // ensure ISO standard
-      topic: topic,
+      topic: cleanTopic,
       meeting_link: zoomJoinUrl
     })
 

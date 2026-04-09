@@ -18,7 +18,7 @@ export default async function ParentDashboard() {
       .eq('parent_id', user.id),
     supabase
       .from('parent_meetings_view')
-      .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, child_name, teacher_name', { count: 'exact' })
+      .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, documents, child_name, teacher_name', { count: 'exact' })
       .eq('parent_id', user.id)
       .order('meeting_time', { ascending: false })
       .range(0, 4)

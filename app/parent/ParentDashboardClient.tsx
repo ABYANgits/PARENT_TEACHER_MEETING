@@ -43,7 +43,7 @@ export default function ParentDashboardClient({
   const fetchMeetings = async () => {
     const { data, count, error } = await supabase
       .from('parent_meetings_view')
-      .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, child_name, teacher_name', { count: 'exact' })
+      .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, documents, child_name, teacher_name', { count: 'exact' })
       .eq('parent_id', userId)
       .order('meeting_time', { ascending: false })
       .range(page * pageSize, (page + 1) * pageSize - 1)
@@ -167,75 +167,112 @@ export default function ParentDashboardClient({
             </button>
           </div>
           
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/80 border-b border-gray-100">
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Date & Time</th>
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Child</th>
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Teacher Name</th>
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Topic</th>
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Teacher Notes</th>
-                    <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {meetings.map((m: any) => (
-                    <tr key={m.meeting_id} className="hover:bg-indigo-50/30 transition-colors">
-                      <td className="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">
-                        {mounted ? new Date(m.meeting_time).toLocaleString(undefined, {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                          hour: 'numeric', minute: '2-digit'
-                        }) : <span className="opacity-0">Loading...</span>}
-                      </td>
-                      <td className="py-4 px-6 text-gray-700 whitespace-nowrap">{m.child_name || 'Unknown Child'}</td>
-                      <td className="py-4 px-6 text-indigo-600 font-medium whitespace-nowrap">{m.teacher_name || 'Unknown Teacher'}</td>
-                      <td className="py-4 px-6 text-gray-700">{m.topic}</td>
-                      <td className="py-4 px-6">
-                        {m.teacher_notes ? (
-                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-700 text-sm">
-                            {m.teacher_notes}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 italic text-sm">No notes provided yet</span>
+          {/* Separate Tables */}
+          {(() => {
+            const upcomingMeetings = meetings.filter((m: any) => mounted && new Date(new Date(m.meeting_time).getTime() + 10 * 60000) > new Date())
+            const historyMeetings = meetings.filter((m: any) => !(mounted && new Date(new Date(m.meeting_time).getTime() + 10 * 60000) > new Date()))
+            
+            const renderTable = (list: any[], title: string, emptyMsg: string) => (
+              <div className="mb-10 last:mb-0">
+                <h3 className="text-xl font-bold text-gray-800 mb-4 px-1">{title}</h3>
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50/80 border-b border-gray-100">
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Date & Time</th>
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Child</th>
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Teacher Name</th>
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Topic</th>
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">Teacher Notes</th>
+                          <th className="py-4 px-6 text-xs uppercase tracking-wider text-gray-500 font-semibold text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {list.map((m: any) => (
+                          <tr key={m.meeting_id} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">
+                              {mounted ? new Date(m.meeting_time).toLocaleString(undefined, {
+                                month: 'short', day: 'numeric', year: 'numeric',
+                                hour: 'numeric', minute: '2-digit'
+                              }) : <span className="opacity-0">Loading...</span>}
+                            </td>
+                            <td className="py-4 px-6 text-gray-700 whitespace-nowrap">{m.child_name || 'Unknown Child'}</td>
+                            <td className="py-4 px-6 text-indigo-600 font-medium whitespace-nowrap">{m.teacher_name || 'Unknown Teacher'}</td>
+                            <td className="py-4 px-6 text-gray-700">{m.topic}</td>
+                            <td className="py-4 px-6">
+                              {m.teacher_notes ? (
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-700 text-sm">
+                                  {m.teacher_notes}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic text-sm">No notes provided yet</span>
+                              )}
+                              
+                              {/* Attached Documents */}
+                              {m.documents && m.documents.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {m.documents.map((doc: any, i: number) => (
+                                    <a 
+                                      key={i} 
+                                      href={supabase.storage.from('meeting_documents').getPublicUrl(doc.path).data.publicUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-indigo-200 text-gray-700 hover:text-indigo-700 text-xs px-3 py-1.5 rounded-lg shadow-sm transition group/doc"
+                                      title={doc.name}
+                                    >
+                                      <svg className="w-3.5 h-3.5 text-gray-400 group-hover/doc:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                      <span className="truncate max-w-[150px]">{doc.name}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              {mounted && new Date(new Date(m.meeting_time).getTime() + 10 * 60000) > new Date() ? (
+                                m.meeting_link ? (
+                                  <a 
+                                    href={m.meeting_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition transform hover:-translate-y-0.5 text-sm"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    Join
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 text-sm italic">No Link</span>
+                                )
+                              ) : (
+                                <span className="text-gray-400 font-medium text-sm bg-gray-100 py-1 px-3 rounded-full">Ended</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {list.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center text-gray-500">
+                              <div className="flex flex-col items-center justify-center">
+                                <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <p>{emptyMsg}</p>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        {mounted && new Date(new Date(m.meeting_time).getTime() + 10 * 60000) > new Date() ? (
-                          m.meeting_link ? (
-                            <a 
-                              href={m.meeting_link} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition transform hover:-translate-y-0.5 text-sm"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                              Join
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-sm italic">No Link</span>
-                          )
-                        ) : (
-                          <span className="text-gray-400 font-medium text-sm bg-gray-100 py-1 px-3 rounded-full">Ended</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {meetings.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-500">
-                        <div className="flex flex-col items-center justify-center">
-                          <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          <p>You haven't booked any meetings yet.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+
+            return (
+              <>
+                {renderTable(upcomingMeetings, "Upcoming Meetings", "No upcoming meetings found on this page.")}
+                {renderTable(historyMeetings, "History", "No past meetings found on this page.")}
+              </>
+            )
+          })()}
           
           {/* Pagination Controls */}
           {totalCount > pageSize && (

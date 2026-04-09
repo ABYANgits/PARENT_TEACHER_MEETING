@@ -15,7 +15,7 @@ export default async function TeacherDashboard() {
   // Server-Side Fetching + Selective Column Fetching + Pagination
   const { data: meetings, count, error } = await supabase
     .from('teacher_meetings_view')
-    .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, child_name, parent_name', { count: 'exact' })
+    .select('meeting_id, meeting_link, meeting_time, topic, teacher_notes, documents, child_name, parent_name', { count: 'exact' })
     .eq('teacher_id', user.id)
     .order('meeting_time', { ascending: true })
     .range(0, 4)
